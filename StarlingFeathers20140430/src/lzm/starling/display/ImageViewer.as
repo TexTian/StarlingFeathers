@@ -24,6 +24,7 @@ package lzm.starling.display
 			layout.gap = 0;
 			
 			this.layout = layout;
+			this.hasElasticEdges = false;
 			this.scrollBarDisplayMode = Scroller.SCROLL_BAR_DISPLAY_MODE_NONE;
 			new MoveOverGestures(this,stopMove);
 		}
@@ -42,7 +43,7 @@ package lzm.starling.display
 			
 			_tempHorizontalPosition = _tempIndex * width;
 			
-			Starling.juggler.tween(this,0.1,{horizontalScrollPosition:_tempHorizontalPosition});
+			Starling.juggler.tween(this,0.2,{horizontalScrollPosition:_tempHorizontalPosition});
 		}
 		
 		public function addImage(image:DisplayObject):void{

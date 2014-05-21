@@ -3,6 +3,8 @@ package lzm.starling.display
 	import flash.filters.GlowFilter;
 	import flash.geom.Rectangle;
 	
+	import starling.animation.Transitions;
+	import starling.core.Starling;
 	import starling.display.DisplayObject;
 	import starling.display.DisplayObjectContainer;
 	import starling.display.Sprite;
@@ -18,6 +20,8 @@ package lzm.starling.display
 	public class Button extends DisplayObjectContainer
 	{
 		protected static const MAX_DRAG_DIST:Number = 0;
+		public static const LITTLE:String = "little";
+		public static const LARGE:String = "large";
 
 		private var _enabled:Boolean = true;
 		protected var _skin:DisplayObject;
@@ -30,17 +34,20 @@ package lzm.starling.display
 		
 		protected var _w:Number;
 		protected var _h:Number;
+		private var _pressType:String = LARGE;
 		
 		
-		public function Button(skin:DisplayObject,text:String=null,textFont:String=null){
+		public function Button(skin:DisplayObject=null,text:String=null,textFont:String=null){
 			_content = new Sprite();
 			addChild(_content);
 			
 			_skin = skin;
-			_content.addChild(_skin);
-			
-			_w = _skin.width;
-			_h = _skin.height;
+			if(_skin)
+			{
+				_content.addChild(_skin);
+				_w = _skin.width;
+				_h = _skin.height;
+			}
 			
 			if(text != null){
 				this.text = text;
@@ -52,18 +59,21 @@ package lzm.starling.display
 		
 		protected function resetContents():void{
 			_isDown = false;
-			_content.x = _content.y = 0;
-			_content.scaleX = _content.scaleY = 1.0;
+			Starling.juggler.tween(_content, .1, {scaleX:1, scaleY:1, x:0, y:0, transition:Transitions.EASE_IN});
 		}
 		
 		protected function onTouch(event:TouchEvent):void{
 			var touch:Touch = event.getTouch(this);
-			if (!enabled || touch == null) return;
+			if (!touchable || touch == null) return;
 			
 			if (touch.phase == TouchPhase.BEGAN && !_isDown){
-				_content.scaleX = _content.scaleY = 0.9;
-				_content.x = (1.0 - 0.9) / 2.0 * _w;
-				_content.y = (1.0 - 0.9) / 2.0 * _h;
+				if(pressType == LITTLE)
+				{
+					Starling.juggler.tween(_content, .1, {scaleX:0.9, scaleY:0.9, x:(1.0 - 0.9) / 2.0 * _w, y:(1.0 - 0.9) / 2.0 * _h, transition:Transitions.EASE_OUT});
+				}else
+				{
+					Starling.juggler.tween(_content, .1, {scaleX:1.2, scaleY:1.2, x:-(1.2-1.0)/2*_w, y:-(1.2-1.0)/2*_h, transition:Transitions.EASE_OUT});
+				}
 				_isDown = true;
 			}else if (touch.phase == TouchPhase.MOVED && _isDown){
 				var buttonRect:Rectangle = getBounds(stage);
@@ -81,16 +91,16 @@ package lzm.starling.display
 		
 		protected function createTextfield():void{
 			if(_textfield == null){
-				_textfield = new TextField(_w,_h,"",_textFont==null?"Verdana":_textFont,12);
+				_textfield = new TextField(_w-20,_h,"",_textFont==null?"Verdana":_textFont,12);
 				_textfield.vAlign = VAlign.CENTER;
 				_textfield.hAlign = HAlign.CENTER;
 				_textfield.touchable = false;
-				_textfield.color = Color.YELLOW;
-				_textfield.nativeFilters = [new GlowFilter(0x000000,1,6,6,6)];
+				/*_textfield.color = Color.YELLOW;
+				_textfield.nativeFilters = [new GlowFilter(0x000000,1,6,6,6)];*/
 				_content.addChild(_textfield);
+				_textfield.width  = _w-20;
+				_textfield.height = _h;
 			}
-			_textfield.width  = _w;
-			_textfield.height = _h;
 			layoutTextField();
 		}
 		
@@ -98,8 +108,8 @@ package lzm.starling.display
 		{
 			if(_textfield)
 			{
-				_textfield.x =( _w -_textfield.width)>>1 ;
-				_textfield.y = (_h - _textfield.height)>>1;
+				_textfield.x =( _w -_textfield.width)*0.5;
+				_textfield.y = (_h - _textfield.height)*0.5;
 			}
 		}
 		
@@ -131,6 +141,18 @@ package lzm.starling.display
 		}
 		public function get skin():DisplayObject{
 			return _skin;
+		}
+		public function set skin(value:DisplayObject):void
+		{
+			if(_skin == value )return;
+			_skin = value;
+			if(_skin)
+				_content.addChildAt(_skin, 0);
+			if(_skin)
+			{
+				_w = _skin.width;
+				_h = _skin.height;
+			}
 		}
 		public function set disabledSkin(value:DisplayObject):void
 		{
@@ -173,6 +195,14 @@ package lzm.starling.display
 			layoutTextField();
 		}
 
-		
+		public function get pressType():String
+		{
+			return _pressType;
+		}
+
+		public function set pressType(value:String):void
+		{
+			_pressType = value;
+		}
 	}
 }
