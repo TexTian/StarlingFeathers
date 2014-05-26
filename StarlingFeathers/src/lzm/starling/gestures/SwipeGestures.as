@@ -20,6 +20,7 @@ package lzm.starling.gestures
 		private static const DIS:int = 50;
 		private var _downPoint:Point;
 		private var _downTime:int;
+		private var _enabled:Boolean=true;
 		public function SwipeGestures(target:DisplayObject, callBack:Function=null)
 		{
 			super(target, callBack);
@@ -46,5 +47,25 @@ package lzm.starling.gestures
 				}
 			}
 		}
+		public function set enableGesture(value:Boolean):void
+		{
+			if(_enabled == value)return;
+			_enabled = value;
+			if(_enabled)
+				_target.addEventListener(TouchEvent.TOUCH,onTouch);
+			else
+				_target.removeEventListener(TouchEvent.TOUCH,onTouch);
+		}
+
+		public function get enabled():Boolean
+		{
+			return _enabled;
+		}
+
+		public function set enabled(value:Boolean):void
+		{
+			_enabled = value;
+		}
+
 	}
 }
