@@ -3,6 +3,7 @@ package lzm.starling.swf.display
 	import feathers.core.IFeathersEventDispatcher;
 	
 	import lzm.starling.swf.Swf;
+	import lzm.starling.swf.blendmode.SwfBlendMode;
 	
 	import starling.display.DisplayObject;
 	import starling.events.Event;
@@ -22,6 +23,7 @@ package lzm.starling.swf.display
 		
 		private var _frames:Array;
 		private var _labels:Array;
+		private var _frameEvents:Object;
 		private var _labelStrings:Array;
 		private var _displayObjects:Object;
 		
@@ -38,38 +40,52 @@ package lzm.starling.swf.display
 		
 		private var _autoUpdate:Boolean = true;
 		
-		public function SwfMovieClip(frames:Array,labels:Array,displayObjects:Object,ownerSwf:Swf){
+		/**
+		 * 影片剪辑
+		 * @param frames 帧信息
+		 * @param labels 标签信息
+		 * @param displayObjects 显示对象
+		 * @param ownerSwf 所属SWF
+		 * @param frameEvents 帧事件
+		 * 
+		 */		
+		public function SwfMovieClip(frames:Array,labels:Array,displayObjects:Object,ownerSwf:Swf,frameEvents:Object = null){
 			super();
 			
 			_frames = frames;
 			_labels = labels;
 			_displayObjects = displayObjects;
+			_frameEvents = frameEvents;
 			
 			_startFrame = 0;
 			_endFrame = _frames.length - 1;
 			_ownerSwf = ownerSwf;
 			
-			currentFrame = 0;
+			_currentFrame = -1;
+//			currentFrame = 0;
 			
 			play();
 		}
-		
+		/**
+		 * 实现ISwfAnimotion的更新方法
+		 * 
+		 */		
 		public function update():void{
 			if (!_isPlay) return;
 			
-			if(_currentFrame == _endFrame){
+			if(_currentFrame >= _endFrame){
+				var isReturn:Boolean = false;
+				
+				if(!_loop || _startFrame == _endFrame){//只有一帧就不要循环下去了
+					if(_ownerSwf) stop(false);
+					isReturn = true;
+				}
+				
 				if(_completeFunction) _completeFunction(this);
 				if(_hasCompleteListener) dispatchEventWith(Event.COMPLETE);
 				
-				if(!_loop){
-					if(_ownerSwf) stop(false);
-					return;
-				}
+				if(isReturn) return;
 				
-				if(_startFrame == _endFrame){//只有一帧就不要循环下去了
-					if(_ownerSwf) stop(false);
-					return;
-				}
 				_currentFrame = _startFrame;
 			}else{
 				_currentFrame ++
@@ -79,6 +95,7 @@ package lzm.starling.swf.display
 		
 		
 		private var __frameInfos:Array;
+		/** 设置/获取 当前帧数 */
 		public function set currentFrame(frame:int):void{
 			clearChild();
 			
@@ -106,32 +123,49 @@ package lzm.starling.swf.display
 					display.mX = data[2];
 					display.mY = data[3];
 				}
-				if(data[1] == Swf.dataKey_Scale9){
-					display.width = data[11];
-					display.height = data[12];
-				}else{
-					display.mScaleX = data[4];
-					display.mScaleY = data[5];
+				
+				switch(data[1]){
+					case Swf.dataKey_Scale9:
+						display.width = data[11];
+						display.height = data[12];
+						SwfBlendMode.setBlendMode(display,data[13]);
+						break;
+					case Swf.dataKey_ShapeImg:
+						display["setSize"](data[11],data[12]);
+						SwfBlendMode.setBlendMode(display,data[13]);
+						break;
+					case Swf.dataKey_TextField:
+						display["width"] = data[11];
+						display["height"] = data[12];
+						display["fontName"] = data[13];
+						display["color"] = data[14];
+						display["fontSize"] = data[15];
+						display["hAlign"] = data[16];
+						display["italic"] = data[17];
+						display["bold"] = data[18];
+						if(data[19] && data[19] != "\r" && data[19] != ""){
+							display["text"] = data[19];
+						}
+						SwfBlendMode.setBlendMode(display,data[20]);
+						break;
+					default:
+						display.mScaleX = data[4];
+						display.mScaleY = data[5];
+						SwfBlendMode.setBlendMode(display,data[11]);
+						break;
 				}
+				
 				if(display is IFeathersEventDispatcher){
 					addChild(display);
 				}else{
 					addQuickChild(display);
 				}
 				
-				if(data[1] == Swf.dataKey_TextField){
-					display["width"] = data[11];
-					display["height"] = data[12];
-					display["fontName"] = data[13];
-					display["color"] = data[14];
-					display["fontSize"] = data[15];
-					display["hAlign"] = data[16];
-					display["italic"] = data[17];
-					display["bold"] = data[18];
-					if(data[19] && data[19] != "\r" && data[19] != ""){
-						display["text"] = data[19];
-					}
-				}
+				
+			}
+			
+			if(_frameEvents != null && _frameEvents[_currentFrame] != null){
+				dispatchEventWith(_frameEvents[_currentFrame]);
 			}
 		}
 		
@@ -145,6 +179,10 @@ package lzm.starling.swf.display
 		 * */
 		public function play(rePlayChildMovie:Boolean = false):void{
 			_isPlay = true;
+			
+			if(_currentFrame >= _endFrame){
+				_currentFrame = _startFrame;
+			}
 			
 			if(_autoUpdate) _ownerSwf.swfUpdateManager.addSwfAnimation(this);
 			
@@ -189,16 +227,30 @@ package lzm.starling.swf.display
 			}
 		}
 		
+		/**
+		 * 移动当前帧位置并停止播放
+		 * @param frame  帧数或标签,使用的是帧数则从该帧起至总帧数的播放范围,使用的是标签则播放范围是该标签所属的.
+		 * @param stopChild  是否停止子动画
+		 * */	
 		public function gotoAndStop(frame:Object,stopChild:Boolean = true):void{
 			goTo(frame);
 			stop(stopChild);
 		}
 		
+		/**
+		 * 移动当前帧位置并开始播放
+		 * @param frame	 帧数或标签,使用的是帧数则从该帧起至总帧数的播放范围,使用的是标签则播放范围是该标签所属的.
+		 * @param rePlayChildMovie  子动画是否重新播放
+		 * */	
 		public function gotoAndPlay(frame:Object,rePlayChildMovie:Boolean = false):void{
 			goTo(frame);
 			play(rePlayChildMovie);
 		}
 		
+		/**
+		 *  移动到起始帧,并确定播放范围
+		 * @param frame 帧或标签
+		 * */
 		private function goTo(frame:*):void{
 			if((frame is String)){
 				var labelData:Array = getLabelData(frame);
@@ -212,6 +264,11 @@ package lzm.starling.swf.display
 			currentFrame = _currentFrame;
 		}
 		
+		/**
+		 * 获取标签信息 
+		 * @param label 标签名
+		 * @return 返回[标签名,起始帧数,结束帧数]
+		 * */		
 		private function getLabelData(label:String):Array{
 			var length:int = _labels.length;
 			var labelData:Array;
@@ -327,6 +384,26 @@ package lzm.starling.swf.display
 		public function get autoUpdate():Boolean{
 			return _autoUpdate;
 		}
+		
+		/** 设置/获取 开始播放的帧 */
+		public function set startFrame(value:int):void{
+			_startFrame = value < 0 ? 0 : value;
+			_startFrame = _startFrame > _endFrame ? _endFrame : _startFrame;
+		}
+		public function get startFrame():int{
+			return _startFrame;
+		}
+		
+		/** 设置/获取 结束播放的帧 */
+		public function set endFrame(value:int):void{
+			_endFrame = value > _frames.length - 1 ? _frames.length - 1 : value;
+			_endFrame = _endFrame < _startFrame ? _startFrame : _endFrame;
+		}
+		public function get endFrame():int{
+			return _endFrame;
+		}
+		
+		
 		
 		public override function dispose():void{
 			_ownerSwf.swfUpdateManager.removeSwfAnimation(this);

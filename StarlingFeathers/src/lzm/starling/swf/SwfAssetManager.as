@@ -2,16 +2,14 @@ package lzm.starling.swf
 {
 	import flash.utils.Dictionary;
 	
-	import feathers.display.Scale9Image;
-	
-	import lzm.starling.display.Button;
+	import lzm.starling.swf.display.SwfButton;
 	import lzm.starling.swf.display.SwfImage;
 	import lzm.starling.swf.display.SwfMovieClip;
+	import lzm.starling.swf.display.SwfParticleSyetem;
 	import lzm.starling.swf.display.SwfScale9Image;
 	import lzm.starling.swf.display.SwfShapeImage;
 	import lzm.starling.swf.display.SwfSprite;
 	
-	import starling.display.Image;
 	import starling.utils.AssetManager;
 
 	/**
@@ -239,6 +237,12 @@ package lzm.starling.swf
 			_swfNames = [];
 		}
 		
+		public function clearAll():void{
+			clearSwf();
+			_otherAssets.purge();
+			_otherAssets.clearRuntimeLoadTexture();
+		}
+		
 		/**
 		 * 获取当前所有已经加载swf的名字
 		 * */
@@ -262,7 +266,7 @@ package lzm.starling.swf
 			return null;
 		}
 		/** 创建Button */
-		public function createButton(name:String):Button{
+		public function createButton(name:String):SwfButton{
 			for each (var swf:Swf in _swfs) if(swf.hasButton(name)) return swf.createButton(name);
 			return null;
 		}
@@ -281,6 +285,11 @@ package lzm.starling.swf
 			for each (var swf:Swf in _swfs) if(swf.hasComponent(name)) return swf.createComponent(name);
 			return null;
 		}
+		/** 创建粒子 */
+		public function createParticle(name:String):SwfParticleSyetem{
+			for each (var swf:Swf in _swfs) if(swf.hasParticle(name)) return swf.createParticle(name);
+			return null;
+		}
 		
 		public function get otherAssets():AssetManager{
 			return _otherAssets;
@@ -293,6 +302,5 @@ package lzm.starling.swf
 				trace("SwfAssetManager:"+message);
 			}
 		}
-		
 	}
 }

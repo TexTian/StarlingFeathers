@@ -1,7 +1,7 @@
 // =================================================================================================
 //
 //	Starling Framework
-//	Copyright 2011 Gamua OG. All Rights Reserved.
+//	Copyright 2011-2014 Gamua. All Rights Reserved.
 //
 //	This program is free software. You can redistribute and/or modify it
 //	in accordance with the terms of the accompanying license agreement.
@@ -40,7 +40,7 @@ package starling.text
      *  
      *  <p>You can set all properties you are used to, like the font name and size, a color, the 
      *  horizontal and vertical alignment, etc. The border property is helpful during development, 
-     *  because it lets you see the bounds of the textfield.</p>
+     *  because it lets you see the bounds of the TextField.</p>
      *  
      *  <p>There are two types of fonts that can be displayed:</p>
      *  
@@ -59,13 +59,20 @@ package starling.text
      * 
      *  <ul>
      *    <li>Windows: <a href="http://www.angelcode.com/products/bmfont">Bitmap Font Generator</a>
-     *       from Angel Code (free). Export the font data as an XML file and the texture as a png 
-     *       with white characters on a transparent background (32 bit).</li>
+     *        from Angel Code (free). Export the font data as an XML file and the texture as a png
+     *        with white characters on a transparent background (32 bit).</li>
      *    <li>Mac OS: <a href="http://glyphdesigner.71squared.com">Glyph Designer</a> from 
      *        71squared or <a href="http://http://www.bmglyph.com">bmGlyph</a> (both commercial). 
      *        They support Starling natively.</li>
      *  </ul>
-     * 
+     *
+     *  <p>When using a bitmap font, the 'color' property is used to tint the font texture. This
+     *  works by multiplying the RGB values of that property with those of the texture's pixel.
+     *  If your font contains just a single color, export it in plain white and change the 'color'
+     *  property to any value you like (it defaults to zero, which means black). If your font
+     *  contains multiple colors, change the 'color' property to <code>Color.WHITE</code> to get
+     *  the intended result.</p>
+     *
      *  <strong>Batching of TextFields</strong>
      *  
      *  <p>Normally, TextFields will require exactly one draw call. For TrueType fonts, you cannot
@@ -103,6 +110,7 @@ package starling.text
         private var mNativeFilters:Array;
         private var mRequiresRedraw:Boolean;
         private var mIsRenderedText:Boolean;
+        private var mIsHtmlText:Boolean;
         private var mTextBounds:Rectangle;
         private var mBatchable:Boolean;
         
@@ -114,7 +122,7 @@ package starling.text
         
         /** Helper objects. */
         private static var sHelperMatrix:Matrix = new Matrix();
-		private static var sNativeTextField:flash.text.TextField = new flash.text.TextField();
+        private static var sNativeTextField:flash.text.TextField = new flash.text.TextField();
         
         /** Create a new text field with the given properties. */
         public function TextField(width:int, height:int, text:String, fontName:String="Verdana",
@@ -183,23 +191,28 @@ package starling.text
             if (mTextBounds == null) 
                 mTextBounds = new Rectangle();
             
-            var scale:Number  = Starling.contentScaleFactor;
+            var texture:Texture;
+            var scale:Number = Starling.contentScaleFactor;
             var bitmapData:BitmapData = renderText(scale, mTextBounds);
             var format:String = sDefaultTextureFormat;
             
             mHitArea.width  = bitmapData.width  / scale;
             mHitArea.height = bitmapData.height / scale;
             
-            var texture:Texture = Texture.fromBitmapData(bitmapData, false, false, scale, format);
+            texture = Texture.fromBitmapData(bitmapData, false, false, scale, format);
             texture.root.onRestore = function():void
             {
                 if (mTextBounds == null)
                     mTextBounds = new Rectangle();
-                
+
+                bitmapData = renderText(scale, mTextBounds);
                 texture.root.uploadBitmapData(renderText(scale, mTextBounds));
+                bitmapData.dispose();
+                bitmapData = null;
             };
             
             bitmapData.dispose();
+            bitmapData = null;
             
             if (mImage == null) 
             {
@@ -217,12 +230,12 @@ package starling.text
 
         /** This method is called immediately before the text is rendered. The intent of
          *  'formatText' is to be overridden in a subclass, so that you can provide custom
-         *  formatting for the TextField. In the overriden method, call 'setFormat' (either
+         *  formatting for the TextField. In the overridden method, call 'setFormat' (either
          *  over a range of characters or the complete TextField) to modify the format to
          *  your needs.
          *  
-         *  @param textField:  the flash.text.TextField object that you can format.
-         *  @param textFormat: the default text format that's currently set on the text field.
+         *  @param textField  the flash.text.TextField object that you can format.
+         *  @param textFormat the default text format that's currently set on the text field.
          */
         protected function formatText(textField:flash.text.TextField, textFormat:TextFormat):void {}
 
@@ -254,8 +267,11 @@ package starling.text
             sNativeTextField.antiAliasType = AntiAliasType.ADVANCED;
             sNativeTextField.selectable = false;            
             sNativeTextField.multiline = true;            
-            sNativeTextField.wordWrap = true;            
-            sNativeTextField.text = mText;
+            sNativeTextField.wordWrap = true;         
+
+            if (mIsHtmlText) sNativeTextField.htmlText = mText;
+            else             sNativeTextField.text     = mText;
+               
             sNativeTextField.embedFonts = true;
             sNativeTextField.filters = mNativeFilters;
             
@@ -315,7 +331,7 @@ package starling.text
             resultTextBounds.setTo((textOffsetX + filterOffset.x) / scale,
                                    (textOffsetY + filterOffset.y) / scale,
                                    textWidth / scale, textHeight / scale);
-			
+            
             return bitmapData;
         }
         
@@ -323,7 +339,7 @@ package starling.text
         {
             var size:Number   = Number(textField.defaultTextFormat.size);
             var maxHeight:int = textField.height - 4;
-            var maxWidth:int  = textField.width - 4;
+            var maxWidth:int  = textField.width  - 4;
             
             while (textField.textWidth > maxWidth || textField.textHeight > maxHeight)
             {
@@ -331,7 +347,10 @@ package starling.text
                 
                 var format:TextFormat = textField.defaultTextFormat;
                 format.size = size--;
-                textField.setTextFormat(format);
+                textField.defaultTextFormat = format;
+
+                if (mIsHtmlText) textField.htmlText = mText;
+                else             textField.text     = mText;
             }
         }
         
@@ -556,8 +575,9 @@ package starling.text
             }
         }
         
-        /** The color of the text. For bitmap fonts, use <code>Color.WHITE</code> to use the
-         *  original, untinted color. @default black */
+        /** The color of the text. Note that bitmap fonts should be exported in plain white so
+         *  that tinting works correctly. If your bitmap font contains colors, set this property
+         *  to <code>Color.WHITE</code> to get the desired result. @default black */
         public function get color():uint { return mColor; }
         public function set color(value:uint):void
         {
@@ -699,16 +719,29 @@ package starling.text
             if (mQuadBatch) mQuadBatch.batchable = value;
         }
 
-        /** The native Flash BitmapFilters to apply to this TextField. 
-         *  Only available when using standard (TrueType) fonts! */
+        /** The native Flash BitmapFilters to apply to this TextField.
+         *
+         *  <p>BEWARE: this property is ignored when using bitmap fonts!</p> */
         public function get nativeFilters():Array { return mNativeFilters; }
         public function set nativeFilters(value:Array) : void
         {
-            if (!mIsRenderedText)
-                throw(new Error("The TextField.nativeFilters property cannot be used on Bitmap fonts."));
-            
             mNativeFilters = value.concat();
             mRequiresRedraw = true;
+        }
+
+        /** Indicates if the assigned text should be interpreted as HTML code. For a description
+         *  of the supported HTML subset, refer to the classic Flash 'TextField' documentation.
+         *  Clickable hyperlinks and external images are not supported.
+         *
+         *  <p>BEWARE: this property is ignored when using bitmap fonts!</p> */
+        public function get isHtmlText():Boolean { return mIsHtmlText; }
+        public function set isHtmlText(value:Boolean):void
+        {
+            if (mIsHtmlText != value)
+            {
+                mIsHtmlText = value;
+                mRequiresRedraw = true;
+            }
         }
         
         /** The Context3D texture format that is used for rendering of all TrueType texts.

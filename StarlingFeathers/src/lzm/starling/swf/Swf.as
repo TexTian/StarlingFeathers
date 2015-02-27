@@ -5,6 +5,7 @@ package lzm.starling.swf
 	
 	import feathers.textures.Scale9Textures;
 	
+	import lzm.starling.swf.blendmode.SwfBlendMode;
 	import lzm.starling.swf.components.ComponentConfig;
 	import lzm.starling.swf.components.ISwfComponent;
 	import lzm.starling.swf.display.SwfButton;
@@ -40,6 +41,7 @@ package lzm.starling.swf
 		public static const dataKey_ShapeImg:String = "shapeImg";
 		public static const dataKey_Component:String = "comp";
 		public static const dataKey_Particle:String = "particle";
+		public static const dataKey_BDClip:String = "bdc";
 		
 		public static const ANGLE_TO_RADIAN:Number = Math.PI / 180;
 		
@@ -65,7 +67,8 @@ package lzm.starling.swf
 			"s9":createS9Image,
 			"shapeImg":createShapeImage,
 			"comp":createComponent,
-			"particle":createParticle
+			"particle":createParticle,
+			"bdc":createMovieClip
 		};
 		
 		private var _assets:AssetManager;
@@ -188,7 +191,10 @@ package lzm.starling.swf
 				}
 			}
 			
-			if(data) sprite.filter = SwfFilter.createFilter(data[10]);//滤镜
+			if(data != null) {
+				sprite.filter = SwfFilter.createFilter(data[10]);//滤镜
+				SwfBlendMode.setBlendMode(sprite,data[11]);
+			}
 			
 			sprite.data = data;
 			sprite.spriteData = sprData;
@@ -202,7 +208,10 @@ package lzm.starling.swf
 		 * 是否有某个MovieClip
 		 * */
 		public function hasMovieClip(name:String):Boolean{
-			return _swfDatas[dataKey_MovieClip][name] != null;
+			if (_swfDatas[dataKey_MovieClip][name] != null)
+				return true;
+
+			return _swfDatas[dataKey_BDClip][name] != null;
 		}
 		
 		/**
@@ -210,6 +219,9 @@ package lzm.starling.swf
 		 * */
 		public function createMovieClip(name:String,data:Array=null):SwfMovieClip{
 			var movieClipData:Object = _swfDatas[dataKey_MovieClip][name];
+			// TODO
+			if (movieClipData == null)
+				movieClipData = _swfDatas[dataKey_BDClip][name];
 			var objectCountData:Object = movieClipData["objCount"];
 			var displayObjects:Object = {};
 			var displayObjectArray:Array;
@@ -231,10 +243,13 @@ package lzm.starling.swf
 				displayObjects[objName] = displayObjectArray;
 			}
 			
-			var mc:SwfMovieClip = new SwfMovieClip(movieClipData["frames"],movieClipData["labels"],displayObjects,this);
+			var mc:SwfMovieClip = new SwfMovieClip(movieClipData["frames"],movieClipData["labels"],displayObjects,this,movieClipData["frameEvents"]);
 			mc.loop = movieClipData["loop"];
 			
-			if(data) mc.filter = SwfFilter.createFilter(data[10]);//滤镜
+			if(data != null) {
+				mc.filter = SwfFilter.createFilter(data[10]);//滤镜
+				SwfBlendMode.setBlendMode(mc,data[11]);
+			}
 			
 			mc.classLink = name;
 			
@@ -263,7 +278,10 @@ package lzm.starling.swf
 			image.pivotX = imageData[0];
 			image.pivotY = imageData[1];
 			
-			if(data) image.filter = SwfFilter.createFilter(data[10]);//滤镜
+			if(data != null) {
+				image.filter = SwfFilter.createFilter(data[10]);//滤镜
+				SwfBlendMode.setBlendMode(image,data[11]);
+			}
 			
 			image.classLink = name;
 			
@@ -285,7 +303,10 @@ package lzm.starling.swf
 			var skin:Sprite = createSprite(null,null,sprData);
 			var button:SwfButton = new SwfButton(skin);
 			
-			if(data) button.filter = SwfFilter.createFilter(data[10]);//滤镜
+			if(data != null) {
+				button.filter = SwfFilter.createFilter(data[10]);//滤镜
+				SwfBlendMode.setBlendMode(button,data[11]);
+			}
 			
 			button.classLink = name;
 			return button;
@@ -304,13 +325,13 @@ package lzm.starling.swf
 		public function createS9Image(name:String,data:Array=null):SwfScale9Image{
 			var scale9Data:Array = _swfDatas[dataKey_Scale9][name];
 			var texture:Texture = _assets.getTexture(name);
-			var s9Texture:Scale9Textures = new Scale9Textures(texture,new Rectangle(scale9Data[0],scale9Data[1],scale9Data[2],scale9Data[3]));
-			var s9image:SwfScale9Image = new SwfScale9Image(s9Texture,1);
+			var s9image:SwfScale9Image = new SwfScale9Image(texture,new Rectangle(scale9Data[0],scale9Data[1],scale9Data[2],scale9Data[3]));
 			
-			if(data){
+			if(data != null){
 				s9image.width = data[10];
 				s9image.height = data[11];
 				s9image.filter = SwfFilter.createFilter(data[12]);//滤镜
+				SwfBlendMode.setBlendMode(s9image,data[13]);
 			}
 			
 			s9image.classLink = name;
@@ -333,9 +354,10 @@ package lzm.starling.swf
 			
 			var shapeImage:SwfShapeImage = new SwfShapeImage(_assets.getTexture(name));
 			
-			if(data){
+			if(data != null){
 				shapeImage.setSize(data[10],data[11]);
 				shapeImage.filter = SwfFilter.createFilter(data[12]);//滤镜
+				SwfBlendMode.setBlendMode(shapeImage,data[13]);
 			}
 			
 			shapeImage.classLink = name;
@@ -346,7 +368,7 @@ package lzm.starling.swf
 		public function createTextField(name:String,data:Array=null):TextField{
 			var textfield:TextField = new TextField(2,2,"");
 			var filters:Array;
-			if(data){
+			if(data != null){
 				textfield.width = data[10];
 				textfield.height = data[11];
 				textfield.fontName = data[12];
@@ -359,6 +381,8 @@ package lzm.starling.swf
 				
 				filters = SwfFilter.createTextFieldFilter(data[19]);
 				if(filters) textfield.nativeFilters = filters;
+				
+				SwfBlendMode.setBlendMode(textfield,data[20]);
 			}
 			return textfield;
 		}
@@ -382,8 +406,11 @@ package lzm.starling.swf
 			var component:ISwfComponent = new componentClass();
 			component.initialization(conponentContnt);
 			
-			if(data){
-				if(component is DisplayObject) component["filter"] = SwfFilter.createFilter(data[11]);//滤镜
+			if(data != null){
+				if(component is DisplayObject) {
+					component["filter"] = SwfFilter.createFilter(data[11]);//滤镜
+					SwfBlendMode.setBlendMode(component as DisplayObject,data[12]);
+				}
 			}
 			return component;
 		}
@@ -456,7 +483,7 @@ package lzm.starling.swf
 			
 			if(disposeAssets){
 				_assets.purge();
-				_assets.dispose();
+				_assets.clearRuntimeLoadTexture();
 			}
 			
 			_assets = null;
